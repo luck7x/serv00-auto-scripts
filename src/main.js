@@ -100,8 +100,15 @@ async function sendTelegramMessage(token, chatId, message) {
 
     // 汇总并发送报告
     const nowBeijing = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
-    const formattedTime = nowBeijing.toISOString().replace('T', ' ').substring(0, 19);
-    const reportTitle = `ct8&serv00 登陆报告（北京时间：${formattedTime}）：`;
+    const year = nowBeijing.getFullYear();
+    const month = String(nowBeijing.getMonth() + 1).padStart(2, '0');
+    const day = String(nowBeijing.getDate()).padStart(2, '0');
+    const hours = String(nowBeijing.getHours()).padStart(2, '0');
+    const minutes = String(nowBeijing.getMinutes()).padStart(2, '0');
+    const seconds = String(nowBeijing.getSeconds()).padStart(2, '0');
+
+    const chineseTime = `${year}年${month}月${day}日 ${hours}时${minutes}分${seconds}秒`;
+    const reportTitle = `ct8&serv00 登陆报告（北京时间：${chineseTime}）：`;
 
     let successCount = 0;
     let failureCount = 0;

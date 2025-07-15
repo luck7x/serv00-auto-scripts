@@ -29,18 +29,17 @@ async function sendTelegramMessage(token, chatId, message) {
     const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
     const telegramChatId = process.env.TELEGRAM_CHAT_ID;
 
-    const panelBaseUrl = "panel"; // panel 基础前缀
-    const defaultDomain = "serv00.com"; // 默认主域名
+    const panelBaseUrl = "panel";
+    const defaultDomain = "serv00.com";
 
-    const loginResults = []; // 存储所有账号的登录结果
+    const loginResults = [];
 
     for (const account of accounts) {
         const { username, password, panelnum, domain } = account;
 
-        // 拼接 panel 地址
         let panel;
         if (domain === "ct8.pl") {
-            panel = `panel.${domain}`; // 固定地址 panel.ct8.pl
+            panel = `panel.${domain}`;
         } else {
             panel = `${panelBaseUrl}${panelnum}.${domain || defaultDomain}`;
         }
@@ -48,18 +47,16 @@ async function sendTelegramMessage(token, chatId, message) {
         const url = `https://${panel}/login/?next=/`;
         console.log(`尝试登录账号 ${username}，地址: ${url}`);
 
-        // 启动 Puppeteer
         const browser = await puppeteer.launch({
-            headless: true, // 设置为 true 以便在无界面环境运行
+            headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, // 如果有指定路径
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
         });
         const page = await browser.newPage();
 
         try {
             await page.goto(url, { waitUntil: 'networkidle2' });
 
-            // 输入账号和密码
             const usernameInput = await page.$('#id_username');
             if (usernameInput) {
                 await usernameInput.click({ clickCount: 3 });
@@ -68,7 +65,6 @@ async function sendTelegramMessage(token, chatId, message) {
             await page.type('#id_username', username);
             await page.type('#id_password', password);
 
-            // 点击登录按钮
             const loginButton = await page.$('#submit');
             if (loginButton) {
                 await loginButton.click();
@@ -76,22 +72,19 @@ async function sendTelegramMessage(token, chatId, message) {
                 throw new Error('无法找到登录按钮');
             }
 
-            // 等待页面导航
             await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
-            // 检查是否登录成功
             const isLoggedIn = await page.evaluate(() => {
                 return document.querySelector('a[href="/logout/"]') !== null;
             });
 
             const nowUtc = formatToISO(new Date());
-            const nowBeijing = formatToISO(new Date(new Date().getTime() + 8 * 60 * 60 * 1000)); // 北京时间
+            const nowBeijing = formatToISO(new Date(new Date().getTime() + 8 * 60 * 60 * 1000));
 
             const serverName = domain === "ct8.pl" ? "ct8" : `serv00-${panelnum}`;
             const status = isLoggedIn ? "登录成功" : "登录失败";
 
             loginResults.push(`账号（${username}）（${serverName}）${status}`);
-
             console.log(`账号 ${username} 于北京时间 ${nowBeijing}（UTC时间 ${nowUtc}）${status}`);
         } catch (error) {
             const serverName = domain === "ct8.pl" ? "ct8" : `serv00-${panelnum}`;
@@ -100,15 +93,48 @@ async function sendTelegramMessage(token, chatId, message) {
         } finally {
             await page.close();
             await browser.close();
-            const delay = Math.floor(Math.random() * 5000) + 1000; // 随机延时1秒到5秒之间
+            const delay = Math.floor(Math.random() * 5000) + 1000;
             await delayTime(delay);
         }
     }
 
     // 汇总并发送报告
-    const reportTitle = "ct8&serv00登陆报告：";
+    const nowBeijing = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+    const year = nowBeijing.getFullYear();
+    const month = String(nowBeijing.getMonth() + 1).padStart(2, '0');
+    const day = String(nowBeijing.getDate()).padStart(2, '0');
+    const hours = String(nowBeijing.getHours()).padStart(2, '0');
+    const minutes = String(nowBeijing.getMinutes()).padStart(2, '0');
+    const seconds = String(nowBeijing.getSeconds()).padStart(2, '0');
+
+    const chineseTime = `${year}年${month}月${day}日 ${hours}时${minutes}分${seconds}秒`;
+    const reportTitle = `ct8&serv00 登陆报告（北京时间：${chineseTime}）：`;
+
+    let successCount = 0;
+    let failureCount = 0;
+    const failedAccounts = [];
+
+    for (const result of loginResults) {
+        if (result.includes('登录成功')) {
+            successCount++;
+        } else {
+            failureCount++;
+            const match = result.match(/账号（(.+?)）/);
+            if (match && match[1]) {
+                failedAccounts.push(match[1]);
+            }
+        }
+    }
+
+    const summary = `✅ 成功：${successCount} 个\n❌ 失败：${failureCount} 个`;
+
+    let failedList = '';
+    if (failedAccounts.length > 0) {
+        failedList = '\n\n🔻 登录失败账号列表：\n' + failedAccounts.map((u, i) => `${i + 1}. ${u}`).join('\n');
+    }
+
     const reportContent = loginResults.join('\n');
-    const finalReport = `${reportTitle}\n${reportContent}`;
+    const finalReport = `${reportTitle}\n${summary}\n\n${reportContent}${failedList}`;
 
     console.log(finalReport);
 

@@ -99,7 +99,9 @@ async function sendTelegramMessage(token, chatId, message) {
     }
 
     // 汇总并发送报告
-    const reportTitle = "ct8&serv00 登陆报告：";
+    const nowBeijing = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+    const formattedTime = nowBeijing.toISOString().replace('T', ' ').substring(0, 19);
+    const reportTitle = `ct8&serv00 登陆报告（北京时间：${formattedTime}）：`;
 
     let successCount = 0;
     let failureCount = 0;
